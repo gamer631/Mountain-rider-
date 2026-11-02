@@ -4,13 +4,13 @@ extends Node3D
 const SAVE_FILE := "user://mountain_rider.cfg"
 const WORLD_LENGTH := 3600.0
 const REGIONS := [
-    {"name":"TERAI PLAINS", "detail":"Open grasslands and foothill roads", "ground":0.0},
-    {"name":"CHITWAN", "detail":"Sal forests and the Narayani river", "ground":0.15},
-    {"name":"POKHARA", "detail":"Lakeside valley beneath the Annapurna range", "ground":0.35},
-    {"name":"ANNAPURNA", "detail":"Terraced hills and high mountain passes", "ground":1.0},
-    {"name":"MUSTANG", "detail":"Arid cliffs and Himalayan desert", "ground":1.5},
-    {"name":"EVEREST REGION", "detail":"Snow peaks, prayer flags and alpine trails", "ground":2.1},
-    {"name":"KATHMANDU VALLEY", "detail":"Historic temples and Himalayan foothills", "ground":0.4}
+    {"name":"TERAI PLAINS", "detail":"Open grasslands and foothill roads", "ground":0.0, "places":"Janakpur - Lumbini - Bardiya"},
+    {"name":"CHITWAN", "detail":"Sal forests and the Narayani river", "ground":0.15, "places":"Sauraha - Chitwan National Park - Narayani River"},
+    {"name":"POKHARA", "detail":"Lakeside valley beneath the Annapurna range", "ground":0.35, "places":"Phewa Lake - Lakeside Pokhara - World Peace Pagoda"},
+    {"name":"ANNAPURNA", "detail":"Terraced hills and high mountain passes", "ground":1.0, "places":"Ghandruk - Annapurna Base Camp - Mardi Himal"},
+    {"name":"MUSTANG", "detail":"Arid cliffs and Himalayan desert", "ground":1.5, "places":"Jomsom - Kagbeni - Muktinath"},
+    {"name":"EVEREST REGION", "detail":"Snow peaks, prayer flags and alpine trails", "ground":2.1, "places":"Lukla - Namche Bazaar - Tengboche"},
+    {"name":"KATHMANDU VALLEY", "detail":"Historic temples and Himalayan foothills", "ground":0.4, "places":"Boudhanath - Swayambhunath - Pashupatinath"}
 ]
 const CARS := [
     {"name":"Trail Jeep","price":0,"power":16.0,"grip":1.0,"top":30.0,"color":Color("#e65336")},
@@ -97,13 +97,17 @@ func _make_environment() -> void:
     env.ambient_light_energy = 0.8
     env.fog_enabled = true
     env.fog_light_color = Color("#b8d1d9")
-    env.fog_density = 0.0016
+    env.fog_density = 0.0011
+    env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
+    env.tonemap_exposure = 1.05
     world.environment = env
     add_child(world)
     var sun := DirectionalLight3D.new()
     sun.rotation_degrees = Vector3(-48,-28,0)
-    sun.light_energy = 1.25
+    sun.light_energy = 1.35
     sun.shadow_enabled = true
+    sun.directional_shadow_max_distance = 110.0
+    sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
     add_child(sun)
     camera = Camera3D.new()
     camera.current = true
