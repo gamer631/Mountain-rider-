@@ -137,7 +137,11 @@ func _make_terrain() -> void:
     add_child(terrain)
 
 func _terrain_vertex(st: SurfaceTool, v: Vector3) -> void:
-    var color := Color("#8b704f") if absf(v.x) < 6.0 else (Color("#60894d") if absf(v.x) < 15.0 else Color("#426e49"))
+    var region := _region_index(v.z)
+    var grass := [Color("#a4a05b"), Color("#547b43"), Color("#67934f"), Color("#71865a"), Color("#a27b54"), Color("#7f8e91"), Color("#70865b")][region]
+    var color := Color("#77766b") if absf(v.x) < 5.5 else (Color("#a08b6c") if absf(v.x) < 6.8 else grass)
+    if absf(v.x) < 5.5 and int(v.z / 10.0) % 2 == 0:
+        color = Color("#817e73")
     st.set_color(color)
     st.add_vertex(v)
 
@@ -557,7 +561,8 @@ func _physics_process(delta: float) -> void:
     _update_hud()
 
 func _update_hud() -> void:
-    var region_name := str(REGIONS[_region_index(distance)]["name"])\n    hud.text="%s   •   COINS %d   •   %d m   •   %d km/h" % [region_name,coins,int(distance),int(speed*3.6)]
+    var region_name := str(REGIONS[_region_index(distance)]["name"])
+    hud.text="%s   •   COINS %d   •   %d m   •   %d km/h" % [region_name,coins,int(distance),int(speed*3.6)]
     fuel_bar.value=fuel
 
 func _update_ui() -> void:
@@ -577,8 +582,8 @@ func _update_ui() -> void:
     brake_btn.visible=state=="playing"
     pause_btn.visible=active
     if state=="menu":
-        title.text="MOUNTAIN RIDER 3D"
-        info.text="Explore mountain roads  •  Offline driving"
+        title.text="MOUNTAIN RIDER  •  NEPAL EXPEDITION"
+        info.text="Drive across Nepal  •  Terai to the Himalayas  •  Offline"
     elif state=="garage":
         title.text=str(CARS[selected]["name"])
         info.text="Wallet: %d coins   •   Vehicle %d of %d" % [wallet,selected+1,CARS.size()]
