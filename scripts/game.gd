@@ -67,7 +67,6 @@ var world_environment: Environment
 var sun_light: DirectionalLight3D
 var graphics_high := true
 var right_btn: Button
-var right_btn: Button
 
 func _ready() -> void:
     rng.randomize()
