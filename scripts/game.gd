@@ -478,6 +478,7 @@ func _make_ui() -> void:
     next_btn=_button(root,"NEXT ▶",0.72,0.72,-105,-27,105,27)
     select_btn=_button(root,"SELECT VEHICLE",0.5,0.84,-130,-28,130,28)
     pause_btn=_button(root,"Ⅱ",0.95,0.04,-34,-24,34,24)
+    settings_btn=_button(root,"GRAPHICS: HIGH",0.5,0.81,-130,-25,130,25)
     left_btn=_button(root,"◀",0.25,0.82,-48,-28,48,28)
     right_btn=_button(root,"▶",0.39,0.82,-48,-28,48,28)
     brake_btn=_button(root,"BRAKE",0.04,0.92,0,-52,145,0)
@@ -490,6 +491,7 @@ func _make_ui() -> void:
     next_btn.pressed.connect(func(): _change_car(1))
     select_btn.pressed.connect(_select_car)
     pause_btn.pressed.connect(_pause)
+    settings_btn.pressed.connect(_toggle_graphics)
     brake_btn.button_down.connect(func(): brake=true)
     brake_btn.button_up.connect(func(): brake=false)
     left_btn.button_down.connect(func(): steer_left=true)
@@ -553,6 +555,7 @@ func _load_save() -> void:
         mission_target=500.0+float(missions_completed)*250.0
         unlocked=cfg.get_value("progress","unlocked",[true,false,false,false])
         selected=clampi(int(cfg.get_value("progress","selected",0)),0,CARS.size()-1)
+        graphics_high=bool(cfg.get_value("settings","graphics_high",true))
 
 func _save() -> void:
     var cfg:=ConfigFile.new()
@@ -561,6 +564,7 @@ func _save() -> void:
     cfg.set_value("progress","missions_completed",missions_completed)
     cfg.set_value("progress","unlocked",unlocked)
     cfg.set_value("progress","selected",selected)
+    cfg.set_value("settings","graphics_high",graphics_high)
     cfg.save(SAVE_FILE)
 
 func _reset_run() -> void:
@@ -592,6 +596,18 @@ func _select_car() -> void:
         _save()
     else:
         info.text="Not enough coins"
+    _update_ui()
+
+
+func _toggle_graphics() -> void:
+    graphics_high = not graphics_high
+    if sun_light != null:
+        sun_light.shadow_enabled = graphics_high
+        sun_light.directional_shadow_max_distance = 150.0 if graphics_high else 65.0
+    if world_environment != null:
+        world_environment.fog_enabled = graphics_high
+        world_environment.glow_enabled = graphics_high
+    _save()
     _update_ui()
 
 func _pause() -> void:
@@ -694,6 +710,8 @@ func _update_ui() -> void:
     left_btn.visible=state=="playing"
     right_btn.visible=state=="playing"
     pause_btn.visible=active
+    settings_btn.visible=state=="menu"
+    settings_btn.text="GRAPHICS: HIGH" if graphics_high else "GRAPHICS: PERFORMANCE"
     if state=="menu":
         title.text="MOUNTAIN RIDER  •  NEPAL EXPEDITION"
         info.text="Nepal Expedition  •  Complete %d m mission for %d bonus coins  •  Best: %d m" % [int(mission_target),mission_reward,int(best)]
