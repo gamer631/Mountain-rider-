@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#132b3b">
+<meta name="description" content="Mountain Rider — an offline 2D mountain driving game.">
+<title>Mountain Rider — Official Game</title>
+<style>
+:root{color-scheme:dark;--bg:#0d1c29;--panel:#172d3d;--ink:#f5f7ee;--muted:#b9c8c8;--lime:#b6e36b;--orange:#ff7658}
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,Segoe UI,sans-serif;background:linear-gradient(180deg,#173b50 0,#0d1c29 65%);color:var(--ink)}
+.wrap{max-width:980px;margin:auto;padding:22px}.nav{display:flex;align-items:center;justify-content:space-between}.brand{font-weight:900;letter-spacing:.08em}.tag{color:var(--lime);font-size:.8rem}
+.hero{padding:70px 0 38px;text-align:center}.hero h1{font-size:clamp(2.5rem,9vw,5.2rem);line-height:.98;margin:14px 0}.hero p{color:var(--muted);font-size:1.08rem;max-width:620px;margin:18px auto 26px}
+.mountain{height:190px;position:relative;overflow:hidden;border-radius:24px;background:linear-gradient(#79c9e9,#d4e8ce 75%);margin:20px 0 28px}
+.sun{position:absolute;width:56px;height:56px;border-radius:50%;background:#ffe58b;right:13%;top:25px}
+.hill{position:absolute;bottom:-65px;width:110%;height:190px;border-radius:50% 50% 0 0;transform:rotate(-8deg);background:#6eae59;left:-5%}
+.hill.two{background:#43834d;bottom:-105px;left:22%;transform:rotate(9deg)}
+.car{position:absolute;z-index:2;bottom:61px;left:43%;font-size:58px;filter:drop-shadow(0 8px 3px #213c4166)}
+.actions{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}.btn{display:inline-block;padding:15px 23px;border-radius:14px;text-decoration:none;font-weight:800;background:var(--lime);color:#172b2b}.btn.secondary{background:#29485a;color:var(--ink);border:1px solid #557184}
+.notice{margin:20px auto 0;max-width:650px;padding:14px 16px;border:1px solid #6a7d7d;border-radius:14px;color:#e6e9dc;background:#172d3dcc}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;margin:38px 0}.card{background:var(--panel);border:1px solid #345064;border-radius:18px;padding:20px}.card h3{margin:0 0 8px}.card p{color:var(--muted);margin:0;line-height:1.55}
+h2{text-align:center;font-size:1.8rem}footer{text-align:center;color:var(--muted);padding:24px 0 40px;font-size:.9rem}a{color:var(--lime)}
+</style></head>
+<body><main class="wrap">
+<nav class="nav"><div class="brand">🏔️ MOUNTAIN RIDER</div><div class="tag">OFFLINE • 2D • ANDROID</div></nav>
+<section class="hero">
+<div class="tag">THE HILLS ARE CALLING</div><h1>Drive the peaks.<br><span style="color:var(--lime)">Own the trail.</span></h1>
+<p>A fun 2D mountain driving game. Climb rolling hills, collect coins, manage fuel and unlock new rides — even when you're offline.</p>
+<div class="mountain"><div class="sun"></div><div class="hill"></div><div class="hill two"></div><div class="car">🚙</div></div>
+<div class="actions">
+<a class="btn" href="https://github.com/gamer631/Mountain-rider-/releases/latest/download/MountainRider.apk">⬇ Download Android APK</a>
+<a class="btn secondary" href="https://github.com/gamer631/Mountain-rider-/archive/refs/heads/main.zip">Get project ZIP</a>
+</div>
+<div class="notice"><strong>Android APK:</strong> The installer link will work once the APK has been successfully built and published in GitHub Releases. The APK is not available yet. The project ZIP is available now.</div>
+</section>
+<h2>Ready for the ride?</h2>
+<section class="grid">
+<div class="card"><h3>⛰️ Rolling terrain</h3><p>Drive across procedurally drawn hills and watch your vehicle react to the slopes.</p></div>
+<div class="card"><h3>🚗 Four vehicles</h3><p>Start with the Trail Jeep, earn coins and unlock more vehicles in the garage.</p></div>
+<div class="card"><h3>🪙 Collect & upgrade</h3><p>Collect coins and fuel cans while pushing your distance record further.</p></div>
+<div class="card"><h3>📴 Offline play</h3><p>Designed as a self-contained game with no online connection required while playing.</p></div>
+</section>
+<h2>How to install on Android</h2>
+<div class="card"><p>When the APK is published: tap <strong>Download Android APK</strong>, open the downloaded file, allow your browser or file manager to install apps if Android asks, then tap <strong>Install</strong>. Only install APKs from this official project page.</p></div>
+<footer>Mountain Rider · Built with Godot · <a href="https://github.com/gamer631/Mountain-rider-">View source on GitHub</a></footer>
+</main></body></html>
