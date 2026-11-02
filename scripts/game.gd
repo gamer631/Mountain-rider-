@@ -66,8 +66,13 @@ func _ready() -> void:
     _reset_run()
     _update_ui()
 
+func _region_index(z: float) -> int:
+    return clampi(int(floor(maxf(0.0, z) / (WORLD_LENGTH / float(REGIONS.size())))), 0, REGIONS.size() - 1)
+
 func _height(z: float) -> float:
-    return 0.7 * sin(z * 0.010) + 1.0 * sin(z * 0.004 + 1.1) + 0.25 * sin(z * 0.027)
+    var region := _region_index(z)
+    var profile := float(REGIONS[region]["ground"])
+    return profile * 1.8 + sin(z * 0.004 + 1.1) * (0.55 + profile * 0.42) + sin(z * 0.010) * (0.35 + profile * 0.22) + sin(z * 0.027) * (0.18 + profile * 0.12)
 
 func _mat(c: Color) -> StandardMaterial3D:
     var m := StandardMaterial3D.new()
@@ -189,6 +194,146 @@ func _make_scenery() -> void:
                 tree.position=Vector3(x,y+1.8+float(tier)*1.05,z)
                 tree.material_override=_mat([Color("#285b42"),Color("#34704a"),Color("#3d8051")][tier])
                 add_child(tree)
+    _make_nepal_landmarks()
+    _make_roadside_details()
+
+func _make_nepal_landmarks() -> void:
+    var span := WORLD_LENGTH / float(REGIONS.size())
+    for i in range(REGIONS.size()):
+        var z := (float(i) + 0.52) * span
+        var side := -1.0 if i % 2 == 0 else 1.0
+        var pos := Vector3(side * 16.0, _height(z), z)
+        var sign := Label3D.new()
+        sign.text = str(REGIONS[i]["name"])
+        sign.font_size = 48
+        sign.pixel_size = 0.012
+        sign.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+        sign.position = pos + Vector3(0, 4.0, 0)
+        sign.modulate = Color("#fff0c9")
+        add_child(sign)
+        if i == 1:
+            _make_watch_tower(pos)
+            _make_bridge(Vector3(-pos.x, _height(z + 18), z + 18))
+        elif i == 2:
+            _make_stupa(pos, 0.9)
+            _make_lake(Vector3(-pos.x, _height(z + 15) - 0.15, z + 15))
+        elif i == 3:
+            _make_terraces(pos)
+            _make_prayer_flags(Vector3(-pos.x, _height(z + 12), z + 12))
+        elif i == 4 or i == 5:
+            _make_chorten(pos)
+            _make_prayer_flags(Vector3(-pos.x, _height(z + 12), z + 12))
+        elif i == 6:
+            _make_pagoda(pos)
+            _make_stupa(Vector3(-pos.x, _height(z + 18), z + 18), 1.1)
+
+func _make_roadside_details() -> void:
+    for i in range(90):
+        var z := float(i) * 39.0 + 10.0
+        for side in [-1.0, 1.0]:
+            _box(self, Vector3(0.12, 0.7, 0.12), Vector3(side * 6.7, _height(z) + 0.35, z), Color("#e2d6b9"))
+
+func _make_watch_tower(pos: Vector3) -> void:
+    _box(self, Vector3(2.8, 0.25, 2.8), pos + Vector3(0, 3.4, 0), Color("#79583b"))
+    for x in [-1.1, 1.1]:
+        for z in [-1.1, 1.1]:
+            _box(self, Vector3(0.16, 3.3, 0.16), pos + Vector3(x, 1.7, z), Color("#62452f"))
+    _box(self, Vector3(3.3, 0.18, 3.3), pos + Vector3(0, 5.2, 0), Color("#9b6840"))
+
+func _make_bridge(pos: Vector3) -> void:
+    _box(self, Vector3(15.0, 0.22, 1.2), pos + Vector3(0, 1.4, 0), Color("#806344"))
+    for side in [-1.0, 1.0]:
+        for i in range(8):
+            _box(self, Vector3(0.12, 1.0, 0.12), pos + Vector3(-6.5 + float(i) * 1.85, 1.9, side * 0.58), Color("#b08a5e"))
+        _box(self, Vector3(0.09, 0.09, 15.0), pos + Vector3(0, 2.55, side * 0.58), Color("#555d60"))
+
+func _make_lake(pos: Vector3) -> void:
+    var lake := MeshInstance3D.new()
+    var plane := PlaneMesh.new()
+    plane.size = Vector2(20, 18)
+    lake.mesh = plane
+    lake.position = pos
+    var water := _mat(Color("#4c9eae"))
+    water.roughness = 0.22
+    water.metallic = 0.12
+    lake.material_override = water
+    add_child(lake)
+
+func _make_terraces(pos: Vector3) -> void:
+    for i in range(7):
+        var width := 9.0 - float(i) * 0.7
+        _box(self, Vector3(width, 0.22, 1.0), pos + Vector3(0, float(i) * 0.65, float(i) * 1.65), Color("#77965a") if i % 2 == 0 else Color("#a18a5b"))
+
+func _make_prayer_flags(pos: Vector3) -> void:
+    var pole := MeshInstance3D.new()
+    var pm := CylinderMesh.new()
+    pm.top_radius = 0.035
+    pm.bottom_radius = 0.055
+    pm.height = 4.2
+    pole.mesh = pm
+    pole.position = pos + Vector3(0, 2.1, 0)
+    pole.material_override = _mat(Color("#6d5238"))
+    add_child(pole)
+    var colors := [Color("#2879bd"), Color("#f0d64b"), Color("#e34e43"), Color("#f4f0df"), Color("#4b9c5c")]
+    for i in range(5):
+        _box(self, Vector3(0.8, 0.34, 0.025), pos + Vector3(0.46, 3.8 - float(i) * 0.42, 0), colors[i])
+
+func _make_stupa(pos: Vector3, scale_factor: float) -> void:
+    var base := MeshInstance3D.new()
+    var bm := CylinderMesh.new()
+    bm.top_radius = 1.25 * scale_factor
+    bm.bottom_radius = 1.55 * scale_factor
+    bm.height = 0.7 * scale_factor
+    base.mesh = bm
+    base.position = pos + Vector3(0, 0.35 * scale_factor, 0)
+    base.material_override = _mat(Color("#eee4ce"))
+    add_child(base)
+    var dome := MeshInstance3D.new()
+    var dm := SphereMesh.new()
+    dm.radius = scale_factor
+    dm.height = 1.45 * scale_factor
+    dome.mesh = dm
+    dome.position = pos + Vector3(0, 1.25 * scale_factor, 0)
+    dome.material_override = _mat(Color("#f3ead6"))
+    add_child(dome)
+    var spire := MeshInstance3D.new()
+    var sm := CylinderMesh.new()
+    sm.top_radius = 0.05
+    sm.bottom_radius = 0.48 * scale_factor
+    sm.height = 1.5 * scale_factor
+    spire.mesh = sm
+    spire.position = pos + Vector3(0, 2.6 * scale_factor, 0)
+    spire.material_override = _mat(Color("#d6a94e"))
+    add_child(spire)
+
+func _make_chorten(pos: Vector3) -> void:
+    _box(self, Vector3(2.0, 1.2, 2.0), pos + Vector3(0, 0.6, 0), Color("#eee3ce"))
+    var roof := MeshInstance3D.new()
+    var cone := CylinderMesh.new()
+    cone.top_radius = 0.0
+    cone.bottom_radius = 1.65
+    cone.height = 1.0
+    cone.radial_segments = 4
+    roof.mesh = cone
+    roof.position = pos + Vector3(0, 1.7, 0)
+    roof.material_override = _mat(Color("#bd8a42"))
+    add_child(roof)
+
+func _make_pagoda(pos: Vector3) -> void:
+    for i in range(3):
+        var y := float(i) * 1.25
+        var width := 4.4 - float(i) * 0.9
+        _box(self, Vector3(width * 0.65, 1.05, width * 0.65), pos + Vector3(0, y + 0.55, 0), Color("#9d6541"))
+        var roof := MeshInstance3D.new()
+        var rm := CylinderMesh.new()
+        rm.top_radius = 0.0
+        rm.bottom_radius = width * 0.72
+        rm.height = 0.7
+        rm.radial_segments = 4
+        roof.mesh = rm
+        roof.position = pos + Vector3(0, y + 1.2, 0)
+        roof.material_override = _mat(Color("#343d42") if i % 2 == 0 else Color("#8a3930"))
+        add_child(roof)
 
 func _make_car() -> void:
     car=Node3D.new()
