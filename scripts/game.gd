@@ -1,6 +1,6 @@
 extends Node3D
 
-# Mountain Rider 3D - procedural low-poly mountain driving for mobile and desktop.
+# Mountain Rider - enhanced procedural Nepal mountain driving prototype.
 const SAVE_FILE := "user://mountain_rider.cfg"
 const WORLD_LENGTH := 3600.0
 const REGIONS := [
@@ -74,6 +74,17 @@ func _height(z: float) -> float:
     var profile := float(REGIONS[region]["ground"])
     return profile * 1.8 + sin(z * 0.004 + 1.1) * (0.55 + profile * 0.42) + sin(z * 0.010) * (0.35 + profile * 0.22) + sin(z * 0.027) * (0.18 + profile * 0.12)
 
+func _terrain_height(x: float, z: float) -> float:
+    # Keep the driving lane smooth while building layered mountain shoulders.
+    var shoulder := smoothstep(5.2, 11.0, absf(x))
+    var distance_from_road := maxf(0.0, absf(x) - 5.0)
+    var region := _region_index(z)
+    var altitude := float(REGIONS[region]["ground"])
+    var ridges := sin(z * 0.0031 + x * 0.055) * 2.8
+    ridges += sin(z * 0.008 + x * 0.12) * 1.15
+    ridges += sin(x * 0.31 + z * 0.0017) * 0.55
+    return _height(z) + shoulder * (ridges + distance_from_road * (0.10 + altitude * 0.035))
+
 func _mat(c: Color) -> StandardMaterial3D:
     var m := StandardMaterial3D.new()
     m.albedo_color = c
@@ -107,7 +118,7 @@ func _make_environment() -> void:
     sun.rotation_degrees = Vector3(-48,-28,0)
     sun.light_energy = 1.35
     sun.shadow_enabled = true
-    sun.directional_shadow_max_distance = 110.0
+    sun.directional_shadow_max_distance = 150.0
     sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
     add_child(sun)
     camera = Camera3D.new()
@@ -117,8 +128,8 @@ func _make_environment() -> void:
 func _make_terrain() -> void:
     var st := SurfaceTool.new()
     st.begin(Mesh.PRIMITIVE_TRIANGLES)
-    var cols := 36
-    var rows := 360
+    var cols := 48
+    var rows := 480
     var width := 60.0
     for iz in range(rows):
         var z0 := -80.0 + float(iz) * WORLD_LENGTH / rows
@@ -126,10 +137,10 @@ func _make_terrain() -> void:
         for ix in range(cols):
             var x0 := -width/2.0 + float(ix) * width / cols
             var x1 := x0 + width / cols
-            var a := Vector3(x0,_height(z0),z0)
-            var b := Vector3(x1,_height(z0),z0)
-            var c := Vector3(x0,_height(z1),z1)
-            var d := Vector3(x1,_height(z1),z1)
+            var a := Vector3(x0,_terrain_height(x0,z0),z0)
+            var b := Vector3(x1,_terrain_height(x1,z0),z0)
+            var c := Vector3(x0,_terrain_height(x0,z1),z1)
+            var d := Vector3(x1,_terrain_height(x1,z1),z1)
             _terrain_vertex(st,a); _terrain_vertex(st,c); _terrain_vertex(st,b)
             _terrain_vertex(st,b); _terrain_vertex(st,c); _terrain_vertex(st,d)
     st.generate_normals()
@@ -357,30 +368,67 @@ func _make_pagoda(pos: Vector3) -> void:
 func _make_car() -> void:
     car=Node3D.new()
     add_child(car)
-    car_body=_box(car,Vector3(2.5,0.72,4.0),Vector3(0,1.2,0),CARS[selected]["color"])
-    _box(car,Vector3(1.8,0.9,1.9),Vector3(0,1.95,-0.15),Color("#a9d1df"))
-    _box(car,Vector3(2.6,0.16,4.1),Vector3(0,1.58,0),Color("#252b30"))
-    _box(car,Vector3(0.4,0.16,0.12),Vector3(-0.72,1.35,2.05),Color("#fff1bd"),true)
-    _box(car,Vector3(0.4,0.16,0.12),Vector3(0.72,1.35,2.05),Color("#fff1bd"),true)
+    # Layered off-road body, cabin and protective hardware.
+    car_body=_box(car,Vector3(2.45,0.72,3.75),Vector3(0,1.22,0),CARS[selected]["color"])
+    _box(car,Vector3(2.12,0.20,3.55),Vector3(0,1.63,-0.02),Color("#252b30"))
+    _box(car,Vector3(1.86,0.92,1.92),Vector3(0,2.02,-0.28),Color("#8eb9c8"))
+    _box(car,Vector3(2.55,0.20,0.32),Vector3(0,1.03,2.0),Color("#30383c"))
+    _box(car,Vector3(2.55,0.20,0.32),Vector3(0,1.03,-1.96),Color("#30383c"))
+    _box(car,Vector3(1.78,0.12,1.05),Vector3(0,1.65,1.18),CARS[selected]["color"])
+    _box(car,Vector3(0.92,0.42,0.08),Vector3(0,1.35,2.02),Color("#171d20"))
+    for i in range(5):
+        _box(car,Vector3(0.055,0.34,0.035),Vector3(-0.34+float(i)*0.17,1.35,2.075),Color("#8c9ba0"))
+    _box(car,Vector3(0.42,0.17,0.12),Vector3(-0.78,1.48,2.04),Color("#fff1bd"),true)
+    _box(car,Vector3(0.42,0.17,0.12),Vector3(0.78,1.48,2.04),Color("#fff1bd"),true)
+    _box(car,Vector3(0.38,0.13,0.12),Vector3(-0.78,1.42,-2.0),Color("#d94c3e"),true)
+    _box(car,Vector3(0.38,0.13,0.12),Vector3(0.78,1.42,-2.0),Color("#d94c3e"),true)
+    # Roof rack and roll cage.
+    for x in [-0.94,0.94]:
+        for z in [-1.05,0.55]:
+            _box(car,Vector3(0.075,0.78,0.075),Vector3(x,2.10,z),Color("#252c30"))
+        _box(car,Vector3(0.09,0.10,2.35),Vector3(x,2.55,-0.25),Color("#252c30"))
+    _box(car,Vector3(1.95,0.10,2.45),Vector3(0,2.57,-0.25),Color("#3b4549"))
+    for side in [-1.0,1.0]:
+        _box(car,Vector3(0.055,0.48,1.25),Vector3(side*1.235,1.34,-0.22),Color("#303b40"))
+        _box(car,Vector3(0.10,0.07,0.22),Vector3(side*1.29,1.57,-0.65),Color("#d3d8d6"))
+        _box(car,Vector3(0.22,0.14,0.18),Vector3(side*1.28,2.18,0.58),Color("#20292d"))
     var tire := CylinderMesh.new()
-    tire.top_radius=0.66; tire.bottom_radius=0.66; tire.height=0.42; tire.radial_segments=16
-    for x in [-1.15,1.15]:
-        for z in [-1.3,1.3]:
+    tire.top_radius=0.68; tire.bottom_radius=0.68; tire.height=0.48; tire.radial_segments=24
+    for x in [-1.22,1.22]:
+        for z in [-1.28,1.28]:
             var w:=MeshInstance3D.new()
             w.mesh=tire
             w.rotation_degrees.z=90
-            w.position=Vector3(x,0.68,z)
-            w.material_override=_mat(Color("#20262a"))
+            w.position=Vector3(x,0.70,z)
+            w.material_override=_mat(Color("#171b1e"))
             car.add_child(w)
             wheels.append(w)
             var hub:=MeshInstance3D.new()
             var hm:=CylinderMesh.new()
-            hm.top_radius=0.26; hm.bottom_radius=0.26; hm.height=0.44
+            hm.top_radius=0.31; hm.bottom_radius=0.31; hm.height=0.50; hm.radial_segments=12
             hub.mesh=hm
             hub.rotation_degrees.z=90
-            hub.position=Vector3(x*1.01,0.68,z)
-            hub.material_override=_mat(Color("#aebbc0"))
+            hub.position=Vector3(x*1.01,0.70,z)
+            hub.material_override=_mat(Color("#b5c0c3"))
             car.add_child(hub)
+            for lug in range(6):
+                var bolt:=MeshInstance3D.new()
+                var bm:=SphereMesh.new()
+                bm.radius=0.045
+                bm.height=0.09
+                bolt.mesh=bm
+                bolt.position=Vector3(x*1.015,0.70+sin(float(lug)*TAU/6.0)*0.20,z+cos(float(lug)*TAU/6.0)*0.20)
+                bolt.material_override=_mat(Color("#333b40"))
+                car.add_child(bolt)
+    var spare:=MeshInstance3D.new()
+    var spare_mesh:=TorusMesh.new()
+    spare_mesh.inner_radius=0.36
+    spare_mesh.outer_radius=0.61
+    spare.mesh=spare_mesh
+    spare.position=Vector3(0,1.78,-2.12)
+    spare.rotation_degrees.x=90
+    spare.material_override=_mat(Color("#171b1e"))
+    car.add_child(spare)
 
 func _box(parent: Node3D, size: Vector3, pos: Vector3, color: Color, glow:=false) -> MeshInstance3D:
     var n:=MeshInstance3D.new()
