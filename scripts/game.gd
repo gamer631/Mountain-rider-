@@ -30,6 +30,11 @@ var fuel := 100.0
 var coins := 0
 var gas := false
 var brake := false
+var steer_left := false
+var steer_right := false
+var steering := 0.0
+var lateral_position := 0.0
+var damage := 0.0
 var pitch := 0.0
 var bounce := 0.0
 var bounce_speed := 0.0
@@ -52,6 +57,8 @@ var home_btn: Button
 var gas_btn: Button
 var brake_btn: Button
 var pause_btn: Button
+var left_btn: Button
+var right_btn: Button
 
 func _ready() -> void:
     rng.randomize()
@@ -467,6 +474,8 @@ func _make_ui() -> void:
     next_btn=_button(root,"NEXT ▶",0.72,0.72,-105,-27,105,27)
     select_btn=_button(root,"SELECT VEHICLE",0.5,0.84,-130,-28,130,28)
     pause_btn=_button(root,"Ⅱ",0.95,0.04,-34,-24,34,24)
+    left_btn=_button(root,"◀",0.25,0.82,-48,-28,48,28)
+    right_btn=_button(root,"▶",0.39,0.82,-48,-28,48,28)
     brake_btn=_button(root,"BRAKE",0.04,0.92,0,-52,145,0)
     gas_btn=_button(root,"ACCELERATE",0.96,0.92,-145,-52,0,0)
     start_btn.pressed.connect(_start)
@@ -479,6 +488,10 @@ func _make_ui() -> void:
     pause_btn.pressed.connect(_pause)
     brake_btn.button_down.connect(func(): brake=true)
     brake_btn.button_up.connect(func(): brake=false)
+    left_btn.button_down.connect(func(): steer_left=true)
+    left_btn.button_up.connect(func(): steer_left=false)
+    right_btn.button_down.connect(func(): steer_right=true)
+    right_btn.button_up.connect(func(): steer_right=false)
     gas_btn.button_down.connect(func(): gas=true)
     gas_btn.button_up.connect(func(): gas=false)
 
@@ -524,6 +537,8 @@ func _resize() -> void:
     if brake_btn!=null:
         brake_btn.offset_top=-58 if portrait else -48
         gas_btn.offset_top=-58 if portrait else -48
+        left_btn.offset_top=-32 if portrait else -28
+        right_btn.offset_top=-32 if portrait else -28
 
 func _load_save() -> void:
     var cfg:=ConfigFile.new()
@@ -543,7 +558,8 @@ func _save() -> void:
 
 func _reset_run() -> void:
     distance=0; speed=0; fuel=100; coins=0; pitch=0; bounce=0; bounce_speed=0; wheel_spin=0
-    gas=false; brake=false
+    gas=false; brake=false; steer_left=false; steer_right=false
+    steering=0.0; lateral_position=0.0; damage=0.0
     car.position=Vector3(0,_height(0)+0.15,0)
     car.rotation=Vector3.ZERO
 
@@ -593,6 +609,14 @@ func _physics_process(delta: float) -> void:
         fuel=maxf(0,fuel-2.1*delta)
     if brake or Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_DOWN):
         speed-=24*delta
+    var steer_input := 0.0
+    if steer_left or Input.is_key_pressed(KEY_A) or Input.is_key_pressed(KEY_LEFT):
+        steer_input -= 1.0
+    if steer_right or Input.is_key_pressed(KEY_D) or Input.is_key_pressed(KEY_RIGHT):
+        steer_input += 1.0
+    steering = move_toward(steering, steer_input, delta * 3.8)
+    var steering_power := (0.9 + speed * 0.075) * float(data["grip"])
+    lateral_position = clampf(lateral_position + steering * steering_power * delta, -5.2, 5.2)
     speed=clampf(speed,0,float(data["top"]))
     speed=move_toward(speed,0,0.8*delta)
     distance+=speed*delta*1.7
@@ -603,10 +627,15 @@ func _physics_process(delta: float) -> void:
     bounce_speed+=(ground-car.position.y)*30*delta
     bounce_speed*=pow(0.15,delta)
     bounce+=bounce_speed*delta
-    car.position=Vector3(0,ground+bounce,distance)
+    # Small suspension response and body roll under steering.
+    car.position=Vector3(lateral_position,ground+bounce,distance)
     car.rotation.x=pitch
-    for w in wheels:
-        w.rotation.x=wheel_spin
+    car.rotation.z=lerp_angle(car.rotation.z,-steering*0.12,minf(1.0,delta*5.0))
+    car.rotation.y=lerp_angle(car.rotation.y,-steering*0.08,minf(1.0,delta*4.0))
+    for i in range(wheels.size()):
+        wheels[i].rotation.x=wheel_spin
+        if i % 2 == 0:
+            wheels[i].rotation.y=steering*0.22
     var size:=get_viewport().get_visible_rect().size
     var portrait:=size.y>size.x
     var cam_target:=car.position+Vector3(0,11 if portrait else 8,-23 if portrait else -15)
@@ -619,13 +648,18 @@ func _physics_process(delta: float) -> void:
             fuel=minf(100,fuel+18)
         else:
             coins+=1
-    if distance>=WORLD_LENGTH-20 or fuel<=0:
+    if absf(lateral_position) > 4.85 and speed > 5.0:
+        damage = minf(100.0, damage + delta * speed * 0.75)
+        speed = move_toward(speed, 0.0, delta * 5.0)
+    else:
+        damage = maxf(0.0, damage - delta * 1.2)
+    if damage >= 100.0 or distance>=WORLD_LENGTH-20 or fuel<=0:
         _finish()
     _update_hud()
 
 func _update_hud() -> void:
     var region_name := str(REGIONS[_region_index(distance)]["name"])
-    hud.text="%s   •   COINS %d   •   %d m   •   %d km/h" % [region_name,coins,int(distance),int(speed*3.6)]
+    hud.text="%s   •   COINS %d   •   %d m   •   %d km/h   •   DAMAGE %d%%" % [region_name,coins,int(distance),int(speed*3.6),int(damage)]
     fuel_bar.value=fuel
 
 func _update_ui() -> void:
@@ -643,6 +677,8 @@ func _update_ui() -> void:
     select_btn.visible=state=="garage"
     gas_btn.visible=state=="playing"
     brake_btn.visible=state=="playing"
+    left_btn.visible=state=="playing"
+    right_btn.visible=state=="playing"
     pause_btn.visible=active
     if state=="menu":
         title.text="MOUNTAIN RIDER  •  NEPAL EXPEDITION"
