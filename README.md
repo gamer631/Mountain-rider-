@@ -14,6 +14,8 @@ An offline 3D mountain-driving game built with Godot 4.4.1. The Nepal Expedition
 - Detailed procedural off-road jeep with roof rack, roll cage, grille, lights, wheel hubs and spare tyre
 - Higher-resolution layered procedural mountain terrain mesh
 - Four vehicles, garage unlocks, coins, fuel and offline saved progress
+- Progressive expedition missions with persistent completion count, increasing distance targets and bonus coin rewards
+- Mission, fuel, damage, speed and region information in the driving HUD
 
 ## Important scope note
 
