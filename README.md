@@ -1,39 +1,32 @@
-# Mountain Rider
+# Mountain Rider — Nepal Expedition
 
-An original, offline, 2D cartoon mountain-driving game built with **Godot 4**. It is inspired by the hill-driving genre, but uses original code and procedural artwork rather than copied game assets.
+An offline 3D mountain-driving game built with Godot 4.4.1. The Nepal Expedition route is a stylized, procedurally generated journey through seven Nepal-inspired regions: Terai, Chitwan, Pokhara, Annapurna, Mustang, Everest Region and Kathmandu Valley.
 
-## Features
+## Nepal-inspired route features
 
-- Side-scrolling rolling hills with layered parallax scenery
-- Acceleration, reverse/brake, gravity, airborne rotation and slope-following suspension feel
-- Four vehicles with different power, grip, speed and prices
-- Collectible coins and fuel cans
-- Persistent wallet, unlocked vehicles, selected vehicle and best distance
-- Touch controls for Android; keyboard controls for desktop
-- No network calls or online dependency
+- Region names and changing landscape profiles along the drive
+- Himalayan peaks, snow caps, forest scenery and rocky highlands
+- Landmark-style scenery: stupa, pagoda temple, chorten, prayer flags, suspension bridge, watch tower, lake view and terraced fields
+- Roadside markers and region signboards
+- Daylight sky, directional shadows and atmospheric fog
+- Portrait and landscape camera framing with mobile touch pedals
+- Four vehicles, garage unlocks, coins, fuel and offline saved progress
+
+## Important scope note
+
+This is a stylized procedural game route, not a geographically exact 1:1 map of Nepal. It does not yet contain every village, road, district boundary, trekking trail or landmark. True AAA photorealism requires licensed terrain/map data, optimized high-resolution textures, and professionally authored 3D assets.
 
 ## Run on desktop
 
-1. Install Godot 4.3 or later.
+1. Install Godot 4.4.1 or later.
 2. Import `project.godot` in Godot.
-3. Press **F6** or **F5** to run.
+3. Press **F5** to run.
 
-Controls: Right/D to accelerate, Left/A to brake/reverse. On mobile, use the on-screen pedals.
+Controls: W/Up to accelerate, S/Down to brake. On mobile, hold the on-screen accelerator and brake pedals.
 
-## Build an Android APK
+## Android APK
 
-The Android export preset and GitHub Actions workflow are included. Pushes to `main` attempt to build a debug APK. Check the Actions tab for the build result and download the `Mountain-Rider-Android-APK` artifact if the workflow succeeds. The APK is a debug build, not a Play Store release.
-
-## Project structure
-
-```text
-Mountain_Rider/
-├── project.godot
-├── main.tscn
-├── scripts/game.gd
-├── export_presets.cfg
-└── .github/workflows/android-apk.yml
-```
+Pushing to `main` starts the Android build workflow. When successful, GitHub Actions uploads an APK artifact and publishes a versioned GitHub Release. The APK is a debug-signed build, not a Play Store release.
 
 ## License
 
