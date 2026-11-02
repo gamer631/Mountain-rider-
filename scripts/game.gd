@@ -27,6 +27,7 @@ var best := 0.0
 var missions_completed := 0
 var mission_target := 500.0
 var mission_reward := 75
+var last_mission_completed := false
 var distance := 0.0
 var speed := 0.0
 var fuel := 100.0
@@ -570,6 +571,7 @@ func _reset_run() -> void:
     car.rotation=Vector3.ZERO
 
 func _start() -> void:
+    last_mission_completed = false
     _reset_run()
     state="playing"
     _update_ui()
@@ -602,6 +604,7 @@ func _pause() -> void:
 func _finish() -> void:
     wallet+=coins
     var mission_won := distance >= mission_target
+    last_mission_completed = mission_won
     if mission_won:
         wallet+=mission_reward
         missions_completed+=1
@@ -700,7 +703,7 @@ func _update_ui() -> void:
         select_btn.text="SELECT VEHICLE" if unlocked[selected] else "UNLOCK  •  %d COINS" % int(CARS[selected]["price"])
     elif state=="crashed":
         title.text="RUN COMPLETE"
-        info.text="Distance: %d m   •   Coins: %d   •   Best: %d m\n%s" % [int(distance),coins,int(best),"MISSION COMPLETE  +%d BONUS" % mission_reward if distance >= mission_target-mission_reward*0 else "Mission target: %d m" % int(mission_target)]
+        info.text="Distance: %d m   •   Coins: %d   •   Best: %d m\n%s" % [int(distance),coins,int(best),"MISSION COMPLETE  +%d BONUS" % mission_reward if last_mission_completed else "Mission target: %d m" % int(mission_target)]
     elif state=="paused":
         title.text="PAUSED"
         info.text="Tap pause to continue"
