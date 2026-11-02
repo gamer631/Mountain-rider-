@@ -4,15 +4,15 @@ config_version=5
 config/name="Mountain Rider"
 config/icon="res://icon.svg"
 run/main_scene="res://main.tscn"
-config/description="An offline 2D mountain driving game"
+config/description="An offline procedural 3D mountain driving game"
 
 [display]
-window/size/viewport_width=960
-window/size/viewport_height=540
+window/size/viewport_width=1280
+window/size/viewport_height=720
 window/size/window_width_override=1280
 window/size/window_height_override=720
 window/stretch/mode="canvas_items"
-window/handheld/orientation=1
+window/handheld/orientation=5
 
 [rendering]
 renderer/rendering_method="gl_compatibility"
