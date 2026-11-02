@@ -9,7 +9,10 @@ An offline 3D mountain-driving game built with Godot 4.4.1. The Nepal Expedition
 - Landmark-style scenery: stupa, pagoda temple, chorten, prayer flags, suspension bridge, watch tower, lake view and terraced fields
 - Roadside markers and region signboards
 - Daylight sky, directional shadows and atmospheric fog
-- Portrait and landscape camera framing with mobile touch pedals
+- Portrait and landscape camera framing with mobile accelerator, brake and steering pedals
+- Lateral steering, speed-sensitive handling, body roll, suspension bounce and edge-impact damage
+- Detailed procedural off-road jeep with roof rack, roll cage, grille, lights, wheel hubs and spare tyre
+- Higher-resolution layered procedural mountain terrain mesh
 - Four vehicles, garage unlocks, coins, fuel and offline saved progress
 
 ## Important scope note
