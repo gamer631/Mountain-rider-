@@ -24,6 +24,9 @@ var selected := 0
 var unlocked := [true,false,false,false]
 var wallet := 0
 var best := 0.0
+var missions_completed := 0
+var mission_target := 500.0
+var mission_reward := 75
 var distance := 0.0
 var speed := 0.0
 var fuel := 100.0
@@ -545,6 +548,8 @@ func _load_save() -> void:
     if cfg.load(SAVE_FILE)==OK:
         wallet=int(cfg.get_value("progress","coins",0))
         best=float(cfg.get_value("progress","best",0.0))
+        missions_completed=int(cfg.get_value("progress","missions_completed",0))
+        mission_target=500.0+float(missions_completed)*250.0
         unlocked=cfg.get_value("progress","unlocked",[true,false,false,false])
         selected=clampi(int(cfg.get_value("progress","selected",0)),0,CARS.size()-1)
 
@@ -552,6 +557,7 @@ func _save() -> void:
     var cfg:=ConfigFile.new()
     cfg.set_value("progress","coins",wallet)
     cfg.set_value("progress","best",best)
+    cfg.set_value("progress","missions_completed",missions_completed)
     cfg.set_value("progress","unlocked",unlocked)
     cfg.set_value("progress","selected",selected)
     cfg.save(SAVE_FILE)
@@ -595,6 +601,11 @@ func _pause() -> void:
 
 func _finish() -> void:
     wallet+=coins
+    var mission_won := distance >= mission_target
+    if mission_won:
+        wallet+=mission_reward
+        missions_completed+=1
+        mission_target=500.0+float(missions_completed)*250.0
     best=maxf(best,distance)
     state="crashed"
     _save()
@@ -659,7 +670,7 @@ func _physics_process(delta: float) -> void:
 
 func _update_hud() -> void:
     var region_name := str(REGIONS[_region_index(distance)]["name"])
-    hud.text="%s   •   COINS %d   •   %d m   •   %d km/h   •   DAMAGE %d%%" % [region_name,coins,int(distance),int(speed*3.6),int(damage)]
+    hud.text="%s   •   %d km/h   •   %d m   •   COINS %d   •   FUEL %d%%   •   DAMAGE %d%%   •   MISSION %d/%d m" % [region_name,int(speed*3.6),int(distance),coins,int(fuel),int(damage),int(distance),int(mission_target)]
     fuel_bar.value=fuel
 
 func _update_ui() -> void:
@@ -682,14 +693,14 @@ func _update_ui() -> void:
     pause_btn.visible=active
     if state=="menu":
         title.text="MOUNTAIN RIDER  •  NEPAL EXPEDITION"
-        info.text="Drive across Nepal  •  Terai to the Himalayas  •  Offline"
+        info.text="Nepal Expedition  •  Complete %d m mission for %d bonus coins  •  Best: %d m" % [int(mission_target),mission_reward,int(best)]
     elif state=="garage":
         title.text=str(CARS[selected]["name"])
-        info.text="Wallet: %d coins   •   Vehicle %d of %d" % [wallet,selected+1,CARS.size()]
+        info.text="Wallet: %d coins   •   Vehicle %d of %d   •   Missions completed: %d" % [wallet,selected+1,CARS.size(),missions_completed]
         select_btn.text="SELECT VEHICLE" if unlocked[selected] else "UNLOCK  •  %d COINS" % int(CARS[selected]["price"])
     elif state=="crashed":
         title.text="RUN COMPLETE"
-        info.text="Distance: %d m   •   Coins: %d   •   Best: %d m" % [int(distance),coins,int(best)]
+        info.text="Distance: %d m   •   Coins: %d   •   Best: %d m\n%s" % [int(distance),coins,int(best),"MISSION COMPLETE  +%d BONUS" % mission_reward if distance >= mission_target-mission_reward*0 else "Mission target: %d m" % int(mission_target)]
     elif state=="paused":
         title.text="PAUSED"
         info.text="Tap pause to continue"
