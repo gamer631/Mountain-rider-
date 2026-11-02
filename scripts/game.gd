@@ -333,6 +333,7 @@ func _start() -> void:
 
 func _change_car(step: int) -> void:
     selected=posmod(selected+step,CARS.size())
+    car_body.material_override=_mat(CARS[selected]["color"])
     _update_ui()
 
 func _select_car() -> void:
@@ -437,8 +438,6 @@ func _update_ui() -> void:
     _update_hud()
 
 func _process(_delta: float) -> void:
-    if car_body!=null:
-        car_body.material_override=_mat(CARS[selected]["color"])
     if state!="playing":
         var portrait:=get_viewport().get_visible_rect().size.y>get_viewport().get_visible_rect().size.x
         var target:=Vector3(0,12,-25) if portrait else Vector3(0,8,-17)
