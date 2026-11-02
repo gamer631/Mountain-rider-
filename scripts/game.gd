@@ -61,7 +61,12 @@ var home_btn: Button
 var gas_btn: Button
 var brake_btn: Button
 var pause_btn: Button
+var settings_btn: Button
 var left_btn: Button
+var world_environment: Environment
+var sun_light: DirectionalLight3D
+var graphics_high := true
+var right_btn: Button
 var right_btn: Button
 
 func _ready() -> void:
@@ -106,6 +111,7 @@ func _mat(c: Color) -> StandardMaterial3D:
 func _make_environment() -> void:
     var world := WorldEnvironment.new()
     var env := Environment.new()
+    world_environment = env
     env.background_mode = Environment.BG_SKY
     var sky := Sky.new()
     var sm := ProceduralSkyMaterial.new()
@@ -126,6 +132,7 @@ func _make_environment() -> void:
     world.environment = env
     add_child(world)
     var sun := DirectionalLight3D.new()
+    sun_light = sun
     sun.rotation_degrees = Vector3(-48,-28,0)
     sun.light_energy = 1.35
     sun.shadow_enabled = true
