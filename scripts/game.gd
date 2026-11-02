@@ -3,6 +3,15 @@ extends Node3D
 # Mountain Rider 3D - procedural low-poly mountain driving for mobile and desktop.
 const SAVE_FILE := "user://mountain_rider.cfg"
 const WORLD_LENGTH := 3600.0
+const REGIONS := [
+    {"name":"TERAI PLAINS", "detail":"Open grasslands and foothill roads", "ground":0.0},
+    {"name":"CHITWAN", "detail":"Sal forests and the Narayani river", "ground":0.15},
+    {"name":"POKHARA", "detail":"Lakeside valley beneath the Annapurna range", "ground":0.35},
+    {"name":"ANNAPURNA", "detail":"Terraced hills and high mountain passes", "ground":1.0},
+    {"name":"MUSTANG", "detail":"Arid cliffs and Himalayan desert", "ground":1.5},
+    {"name":"EVEREST REGION", "detail":"Snow peaks, prayer flags and alpine trails", "ground":2.1},
+    {"name":"KATHMANDU VALLEY", "detail":"Historic temples and Himalayan foothills", "ground":0.4}
+]
 const CARS := [
     {"name":"Trail Jeep","price":0,"power":16.0,"grip":1.0,"top":30.0,"color":Color("#e65336")},
     {"name":"Rally Buggy","price":350,"power":21.0,"grip":0.9,"top":38.0,"color":Color("#e7b83f")},
@@ -403,7 +412,7 @@ func _physics_process(delta: float) -> void:
     _update_hud()
 
 func _update_hud() -> void:
-    hud.text="COINS  %d     DISTANCE  %d m     SPEED  %d km/h" % [coins,int(distance),int(speed*3.6)]
+    var region_name := str(REGIONS[_region_index(distance)]["name"])\n    hud.text="%s   •   COINS %d   •   %d m   •   %d km/h" % [region_name,coins,int(distance),int(speed*3.6)]
     fuel_bar.value=fuel
 
 func _update_ui() -> void:
