@@ -215,6 +215,16 @@ func _make_nepal_landmarks() -> void:
         sign.position = pos + Vector3(0, 4.0, 0)
         sign.modulate = Color("#fff0c9")
         add_child(sign)
+        var places := str(REGIONS[i]["places"]).split(" · ")
+        for place_index in range(places.size()):
+            var destination := Label3D.new()
+            destination.text = places[place_index]
+            destination.font_size = 28
+            destination.pixel_size = 0.009
+            destination.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+            destination.position = pos + Vector3(-side * 3.0, 2.0 + float(place_index) * 0.7, 1.8)
+            destination.modulate = Color("#f4e6c5")
+            add_child(destination)
         if i == 1:
             _make_watch_tower(pos)
             _make_bridge(Vector3(-pos.x, _height(z + 18), z + 18))
