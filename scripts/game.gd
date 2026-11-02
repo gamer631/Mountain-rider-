@@ -1,381 +1,446 @@
-extends Node2D
+extends Node3D
 
-# Mountain Rider - self-contained offline 2D hill-driving game.
-# All artwork is drawn in code; no network connection or external assets required.
-
-const VIEW := Vector2(960.0, 540.0)
-const GRAVITY := 1050.0
+# Mountain Rider 3D - procedural low-poly mountain driving for mobile and desktop.
 const SAVE_FILE := "user://mountain_rider.cfg"
-const CAR_DATA := [
-    {"name":"Trail Jeep", "price":0, "power":1.00, "grip":1.00, "color":Color("#e65336"), "top":560.0},
-    {"name":"Rally Buggy", "price":350, "power":1.25, "grip":0.92, "color":Color("#e7b83f"), "top":650.0},
-    {"name":"Mountain Truck", "price":700, "power":0.90, "grip":1.35, "color":Color("#398bd0"), "top":490.0},
-    {"name":"Ridge Racer", "price":1200, "power":1.52, "grip":0.90, "color":Color("#8b62c9"), "top":720.0}
+const WORLD_LENGTH := 3600.0
+const CARS := [
+    {"name":"Trail Jeep","price":0,"power":16.0,"grip":1.0,"top":30.0,"color":Color("#e65336")},
+    {"name":"Rally Buggy","price":350,"power":21.0,"grip":0.9,"top":38.0,"color":Color("#e7b83f")},
+    {"name":"Mountain Truck","price":700,"power":14.0,"grip":1.3,"top":26.0,"color":Color("#398bd0")},
+    {"name":"Ridge Racer","price":1200,"power":24.0,"grip":0.85,"top":42.0,"color":Color("#8b62c9")}
 ]
-
-var screen_size := VIEW
-var game_state := "menu"
-var selected_car := 0
-var unlocked := [true, false, false, false]
-var bank_coins := 0
-var best_distance := 0.0
-var world_x := 0.0
-var distance_m := 0.0
-var run_coins := 0
+var rng := RandomNumberGenerator.new()
+var state := "menu"
+var selected := 0
+var unlocked := [true,false,false,false]
+var wallet := 0
+var best := 0.0
+var distance := 0.0
+var speed := 0.0
 var fuel := 100.0
-var velocity_x := 0.0
-var body_y := 0.0
-var velocity_y := 0.0
-var car_angle := 0.0
-var angular_velocity := 0.0
-var wheel_rotation := 0.0
-var grounded := true
-var gas_down := false
-var brake_down := false
-var touch_gas := false
-var touch_brake := false
-var pickups: Array[Dictionary] = []
-var toast := ""
-var toast_time := 0.0
-var button_rects: Dictionary = {}
+var coins := 0
+var gas := false
+var brake := false
+var pitch := 0.0
+var bounce := 0.0
+var bounce_speed := 0.0
+var wheel_spin := 0.0
+var car: Node3D
+var car_body: MeshInstance3D
+var wheels: Array[MeshInstance3D] = []
+var camera: Camera3D
+var title: Label
+var info: Label
+var hud: Label
+var fuel_bar: ProgressBar
+var start_btn: Button
+var garage_btn: Button
+var prev_btn: Button
+var next_btn: Button
+var select_btn: Button
+var retry_btn: Button
+var home_btn: Button
+var gas_btn: Button
+var brake_btn: Button
+var pause_btn: Button
 
 func _ready() -> void:
-    get_viewport().size_changed.connect(_on_resize)
-    _on_resize()
-    _load_progress()
+    rng.randomize()
+    _load_save()
+    _make_environment()
+    _make_terrain()
+    _make_scenery()
+    _make_car()
+    _make_ui()
+    get_viewport().size_changed.connect(_resize)
+    _resize()
     _reset_run()
-    set_process(true)
-    set_physics_process(true)
+    _update_ui()
 
-func _on_resize() -> void:
-    screen_size = get_viewport_rect().size
-    queue_redraw()
+func _height(z: float) -> float:
+    return 0.7 * sin(z * 0.010) + 1.0 * sin(z * 0.004 + 1.1) + 0.25 * sin(z * 0.027)
 
-func _load_progress() -> void:
-    var cfg := ConfigFile.new()
-    if cfg.load(SAVE_FILE) == OK:
-        bank_coins = int(cfg.get_value("progress", "coins", 0))
-        best_distance = float(cfg.get_value("progress", "best", 0.0))
-        unlocked = cfg.get_value("progress", "unlocked", [true, false, false, false])
-        selected_car = clampi(int(cfg.get_value("progress", "selected", 0)), 0, CAR_DATA.size() - 1)
+func _mat(c: Color) -> StandardMaterial3D:
+    var m := StandardMaterial3D.new()
+    m.albedo_color = c
+    m.roughness = 0.95
+    return m
 
-func _save_progress() -> void:
-    var cfg := ConfigFile.new()
-    cfg.set_value("progress", "coins", bank_coins)
-    cfg.set_value("progress", "best", best_distance)
-    cfg.set_value("progress", "unlocked", unlocked)
-    cfg.set_value("progress", "selected", selected_car)
+func _make_environment() -> void:
+    var world := WorldEnvironment.new()
+    var env := Environment.new()
+    env.background_mode = Environment.BG_SKY
+    var sky := Sky.new()
+    var sm := ProceduralSkyMaterial.new()
+    sm.sky_top_color = Color("#2876a5")
+    sm.sky_horizon_color = Color("#c2dce5")
+    sm.ground_bottom_color = Color("#344b42")
+    sm.ground_horizon_color = Color("#a9beb4")
+    sky.sky_material = sm
+    env.sky = sky
+    env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+    env.ambient_light_color = Color("#b8cbd2")
+    env.ambient_light_energy = 0.8
+    env.fog_enabled = true
+    env.fog_light_color = Color("#b8d1d9")
+    env.fog_density = 0.0016
+    world.environment = env
+    add_child(world)
+    var sun := DirectionalLight3D.new()
+    sun.rotation_degrees = Vector3(-48,-28,0)
+    sun.light_energy = 1.25
+    sun.shadow_enabled = true
+    add_child(sun)
+    camera = Camera3D.new()
+    camera.current = true
+    add_child(camera)
+
+func _make_terrain() -> void:
+    var st := SurfaceTool.new()
+    st.begin(Mesh.PRIMITIVE_TRIANGLES)
+    var cols := 36
+    var rows := 360
+    var width := 60.0
+    for iz in range(rows):
+        var z0 := -80.0 + float(iz) * WORLD_LENGTH / rows
+        var z1 := z0 + WORLD_LENGTH / rows
+        for ix in range(cols):
+            var x0 := -width/2.0 + float(ix) * width / cols
+            var x1 := x0 + width / cols
+            var a := Vector3(x0,_height(z0),z0)
+            var b := Vector3(x1,_height(z0),z0)
+            var c := Vector3(x0,_height(z1),z1)
+            var d := Vector3(x1,_height(z1),z1)
+            _terrain_vertex(st,a); _terrain_vertex(st,c); _terrain_vertex(st,b)
+            _terrain_vertex(st,b); _terrain_vertex(st,c); _terrain_vertex(st,d)
+    st.generate_normals()
+    var terrain := MeshInstance3D.new()
+    terrain.mesh = st.commit()
+    var material := StandardMaterial3D.new()
+    material.vertex_color_use_as_albedo = true
+    material.roughness = 1.0
+    terrain.material_override = material
+    add_child(terrain)
+
+func _terrain_vertex(st: SurfaceTool, v: Vector3) -> void:
+    var color := Color("#8b704f") if absf(v.x) < 6.0 else (Color("#60894d") if absf(v.x) < 15.0 else Color("#426e49"))
+    st.set_color(color)
+    st.add_vertex(v)
+
+func _make_scenery() -> void:
+    for i in range(18):
+        var side := -1.0 if i % 2 == 0 else 1.0
+        var peak := MeshInstance3D.new()
+        var cone := CylinderMesh.new()
+        cone.top_radius = 0.0
+        cone.bottom_radius = rng.randf_range(25.0,38.0)
+        cone.height = rng.randf_range(48.0,72.0)
+        cone.radial_segments = 5
+        peak.mesh = cone
+        peak.position = Vector3(side * rng.randf_range(48.0,70.0),22.0,float(i)*215.0)
+        peak.material_override = _mat(Color("#718b91") if i%2==0 else Color("#839a9c"))
+        add_child(peak)
+        var cap := MeshInstance3D.new()
+        var cap_mesh := PrismMesh.new()
+        cap_mesh.size = Vector3(13,9,13)
+        cap.mesh = cap_mesh
+        cap.position = peak.position + Vector3(0,28,0)
+        cap.material_override = _mat(Color("#e8eff0"))
+        add_child(cap)
+    for i in range(95):
+        var z := rng.randf_range(-20.0,WORLD_LENGTH-30.0)
+        var x := (-1.0 if i%2==0 else 1.0) * rng.randf_range(9.0,25.0)
+        var y := _height(z)
+        if i%5==0:
+            var rock := MeshInstance3D.new()
+            var sphere := SphereMesh.new()
+            sphere.radius = rng.randf_range(0.5,1.0)
+            sphere.height = sphere.radius*1.4
+            rock.mesh = sphere
+            rock.position = Vector3(x,y+0.3,z)
+            rock.scale = Vector3(1.5,0.8,1.0)
+            rock.material_override = _mat(Color("#777e7b"))
+            add_child(rock)
+        else:
+            var trunk := MeshInstance3D.new()
+            var tm := CylinderMesh.new()
+            tm.top_radius=0.1; tm.bottom_radius=0.2; tm.height=1.8
+            trunk.mesh=tm
+            trunk.position=Vector3(x,y+0.9,z)
+            trunk.material_override=_mat(Color("#604b37"))
+            add_child(trunk)
+            for tier in range(3):
+                var tree := MeshInstance3D.new()
+                var foliage := CylinderMesh.new()
+                foliage.top_radius=0.0
+                foliage.bottom_radius=1.25-float(tier)*0.22
+                foliage.height=2.1
+                foliage.radial_segments=6
+                tree.mesh=foliage
+                tree.position=Vector3(x,y+1.8+float(tier)*1.05,z)
+                tree.material_override=_mat([Color("#285b42"),Color("#34704a"),Color("#3d8051")][tier])
+                add_child(tree)
+
+func _make_car() -> void:
+    car=Node3D.new()
+    add_child(car)
+    car_body=_box(car,Vector3(2.5,0.72,4.0),Vector3(0,1.2,0),CARS[selected]["color"])
+    _box(car,Vector3(1.8,0.9,1.9),Vector3(0,1.95,-0.15),Color("#a9d1df"))
+    _box(car,Vector3(2.6,0.16,4.1),Vector3(0,1.58,0),Color("#252b30"))
+    _box(car,Vector3(0.4,0.16,0.12),Vector3(-0.72,1.35,2.05),Color("#fff1bd"),true)
+    _box(car,Vector3(0.4,0.16,0.12),Vector3(0.72,1.35,2.05),Color("#fff1bd"),true)
+    var tire := CylinderMesh.new()
+    tire.top_radius=0.66; tire.bottom_radius=0.66; tire.height=0.42; tire.radial_segments=16
+    for x in [-1.15,1.15]:
+        for z in [-1.3,1.3]:
+            var w:=MeshInstance3D.new()
+            w.mesh=tire
+            w.rotation_degrees.z=90
+            w.position=Vector3(x,0.68,z)
+            w.material_override=_mat(Color("#20262a"))
+            car.add_child(w)
+            wheels.append(w)
+            var hub:=MeshInstance3D.new()
+            var hm:=CylinderMesh.new()
+            hm.top_radius=0.26; hm.bottom_radius=0.26; hm.height=0.44
+            hub.mesh=hm
+            hub.rotation_degrees.z=90
+            hub.position=Vector3(x*1.01,0.68,z)
+            hub.material_override=_mat(Color("#aebbc0"))
+            car.add_child(hub)
+
+func _box(parent: Node3D, size: Vector3, pos: Vector3, color: Color, glow:=false) -> MeshInstance3D:
+    var n:=MeshInstance3D.new()
+    var mesh:=BoxMesh.new()
+    mesh.size=size
+    n.mesh=mesh
+    n.position=pos
+    var m:=_mat(color)
+    if glow:
+        m.emission_enabled=true
+        m.emission=color
+        m.emission_energy_multiplier=0.35
+    n.material_override=m
+    parent.add_child(n)
+    return n
+
+func _make_ui() -> void:
+    var layer:=CanvasLayer.new()
+    add_child(layer)
+    var root:=Control.new()
+    root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+    layer.add_child(root)
+    title=_label(root,30,0.5,0.08,0.5,0.08,-250,0,250,52,HORIZONTAL_ALIGNMENT_CENTER)
+    info=_label(root,17,0.5,0.17,0.5,0.17,-280,0,280,48,HORIZONTAL_ALIGNMENT_CENTER)
+    hud=_label(root,16,0.03,0.02,0.75,0.02,0,0,0,40,HORIZONTAL_ALIGNMENT_LEFT)
+    fuel_bar=ProgressBar.new()
+    fuel_bar.min_value=0; fuel_bar.max_value=100; fuel_bar.show_percentage=false
+    fuel_bar.anchor_left=0.03; fuel_bar.anchor_top=0.075; fuel_bar.anchor_right=0.35; fuel_bar.anchor_bottom=0.075
+    fuel_bar.offset_bottom=16
+    root.add_child(fuel_bar)
+    start_btn=_button(root,"START DRIVE",0.5,0.57,-130,-28,130,28)
+    garage_btn=_button(root,"GARAGE",0.5,0.69,-130,-28,130,28)
+    retry_btn=_button(root,"DRIVE AGAIN",0.5,0.58,-130,-28,130,28)
+    home_btn=_button(root,"MAIN MENU",0.5,0.70,-130,-28,130,28)
+    prev_btn=_button(root,"◀ PREVIOUS",0.28,0.72,-105,-27,105,27)
+    next_btn=_button(root,"NEXT ▶",0.72,0.72,-105,-27,105,27)
+    select_btn=_button(root,"SELECT VEHICLE",0.5,0.84,-130,-28,130,28)
+    pause_btn=_button(root,"Ⅱ",0.95,0.04,-34,-24,34,24)
+    brake_btn=_button(root,"BRAKE",0.04,0.92,0,-52,145,0)
+    gas_btn=_button(root,"ACCELERATE",0.96,0.92,-145,-52,0,0)
+    start_btn.pressed.connect(_start)
+    garage_btn.pressed.connect(func(): state="garage"; _update_ui())
+    retry_btn.pressed.connect(_start)
+    home_btn.pressed.connect(func(): state="menu"; _update_ui())
+    prev_btn.pressed.connect(func(): _change_car(-1))
+    next_btn.pressed.connect(func(): _change_car(1))
+    select_btn.pressed.connect(_select_car)
+    pause_btn.pressed.connect(_pause)
+    brake_btn.button_down.connect(func(): brake=true)
+    brake_btn.button_up.connect(func(): brake=false)
+    gas_btn.button_down.connect(func(): gas=true)
+    gas_btn.button_up.connect(func(): gas=false)
+
+func _label(parent: Control, size: int, al: float, at: float, ar: float, ab: float, l: float, t: float, r: float, b: float, align: int) -> Label:
+    var n:=Label.new()
+    n.horizontal_alignment=align
+    n.vertical_alignment=VERTICAL_ALIGNMENT_CENTER
+    n.add_theme_font_size_override("font_size",size)
+    n.add_theme_color_override("font_color",Color.WHITE)
+    n.add_theme_color_override("font_shadow_color",Color("#17252acc"))
+    n.add_theme_constant_override("shadow_offset_x",2)
+    n.add_theme_constant_override("shadow_offset_y",2)
+    n.anchor_left=al; n.anchor_top=at; n.anchor_right=ar; n.anchor_bottom=ab
+    n.offset_left=l; n.offset_top=t; n.offset_right=r; n.offset_bottom=b
+    parent.add_child(n)
+    return n
+
+func _button(parent: Control, text_value: String, ax: float, ay: float, l: float, t: float, r: float, b: float) -> Button:
+    var n:=Button.new()
+    n.text=text_value
+    n.anchor_left=ax; n.anchor_right=ax; n.anchor_top=ay; n.anchor_bottom=ay
+    n.offset_left=l; n.offset_top=t; n.offset_right=r; n.offset_bottom=b
+    n.add_theme_font_size_override("font_size",17)
+    n.add_theme_color_override("font_color",Color.WHITE)
+    var style:=StyleBoxFlat.new()
+    style.bg_color=Color("#203c4cee")
+    style.corner_radius_top_left=14; style.corner_radius_top_right=14
+    style.corner_radius_bottom_left=14; style.corner_radius_bottom_right=14
+    style.border_width_left=1; style.border_width_right=1; style.border_width_top=1; style.border_width_bottom=1
+    style.border_color=Color("#ffffff66")
+    n.add_theme_stylebox_override("normal",style)
+    parent.add_child(n)
+    return n
+
+func _resize() -> void:
+    if camera==null:
+        return
+    var s:=get_viewport().get_visible_rect().size
+    var portrait:=s.y>s.x
+    camera.position=Vector3(0,11 if portrait else 8,-23 if portrait else -15)
+    camera.fov=76 if portrait else 68
+    camera.look_at(Vector3(0,1.5,5),Vector3.UP)
+    if brake_btn!=null:
+        brake_btn.offset_top=-58 if portrait else -48
+        gas_btn.offset_top=-58 if portrait else -48
+
+func _load_save() -> void:
+    var cfg:=ConfigFile.new()
+    if cfg.load(SAVE_FILE)==OK:
+        wallet=int(cfg.get_value("progress","coins",0))
+        best=float(cfg.get_value("progress","best",0.0))
+        unlocked=cfg.get_value("progress","unlocked",[true,false,false,false])
+        selected=clampi(int(cfg.get_value("progress","selected",0)),0,CARS.size()-1)
+
+func _save() -> void:
+    var cfg:=ConfigFile.new()
+    cfg.set_value("progress","coins",wallet)
+    cfg.set_value("progress","best",best)
+    cfg.set_value("progress","unlocked",unlocked)
+    cfg.set_value("progress","selected",selected)
     cfg.save(SAVE_FILE)
 
 func _reset_run() -> void:
-    world_x = 0.0
-    distance_m = 0.0
-    run_coins = 0
-    fuel = 100.0
-    velocity_x = 0.0
-    velocity_y = 0.0
-    car_angle = 0.0
-    angular_velocity = 0.0
-    wheel_rotation = 0.0
-    body_y = _ground_y(0.0) - 54.0
-    grounded = true
-    gas_down = false
-    brake_down = false
-    touch_gas = false
-    touch_brake = false
-    pickups.clear()
-    for i in range(1, 220):
-        var px := float(i) * 255.0 + randf_range(-35.0, 35.0)
-        var kind := "fuel" if i % 6 == 0 else "coin"
-        pickups.append({"x": px, "y": _ground_y(px) - randf_range(90.0, 145.0), "kind": kind, "taken": false})
+    distance=0; speed=0; fuel=100; coins=0; pitch=0; bounce=0; bounce_speed=0; wheel_spin=0
+    gas=false; brake=false
+    car.position=Vector3(0,_height(0)+0.15,0)
+    car.rotation=Vector3.ZERO
 
-func _ground_y(x: float) -> float:
-    return 385.0 - 72.0 * sin(x * 0.0048) - 35.0 * sin(x * 0.011 + 1.2) - 17.0 * sin(x * 0.025)
+func _start() -> void:
+    _reset_run()
+    state="playing"
+    _update_ui()
 
-func _ground_slope(x: float) -> float:
-    return atan((_ground_y(x + 4.0) - _ground_y(x - 4.0)) / 8.0)
+func _change_car(step: int) -> void:
+    selected=posmod(selected+step,CARS.size())
+    _update_ui()
+
+func _select_car() -> void:
+    var price=int(CARS[selected]["price"])
+    if unlocked[selected]:
+        state="menu"
+    elif wallet>=price:
+        wallet-=price
+        unlocked[selected]=true
+        state="menu"
+        _save()
+    else:
+        info.text="Not enough coins"
+    _update_ui()
+
+func _pause() -> void:
+    if state=="playing":
+        state="paused"
+    elif state=="paused":
+        state="playing"
+    _update_ui()
+
+func _finish() -> void:
+    wallet+=coins
+    best=maxf(best,distance)
+    state="crashed"
+    _save()
+    _update_ui()
 
 func _physics_process(delta: float) -> void:
-    if game_state != "playing":
+    if state!="playing":
         return
-    var car: Dictionary = CAR_DATA[selected_car]
-    var accelerating := gas_down or touch_gas or Input.is_key_pressed(KEY_RIGHT) or Input.is_key_pressed(KEY_D)
-    var reversing := brake_down or touch_brake or Input.is_key_pressed(KEY_LEFT) or Input.is_key_pressed(KEY_A)
-    if accelerating and fuel > 0.0:
-        velocity_x += 480.0 * float(car["power"]) * delta
-        fuel = maxf(0.0, fuel - 3.4 * delta)
-    if reversing:
-        velocity_x -= 370.0 * delta
-    velocity_x = clampf(velocity_x, -160.0, float(car["top"]))
-    velocity_x *= 1.0 - 0.20 * delta
-    world_x = maxf(0.0, world_x + velocity_x * delta)
-    distance_m = world_x / 10.0
-    wheel_rotation += velocity_x * delta / 22.0
-    var slope := _ground_slope(world_x)
-    var ground_contact := minf(_ground_y(world_x - 29.0), _ground_y(world_x + 29.0)) - 43.0
-    if body_y >= ground_contact and velocity_y >= 0.0:
-        body_y = lerpf(body_y, ground_contact, minf(1.0, 18.0 * delta))
-        velocity_y = 0.0
-        grounded = true
-        angular_velocity += wrapf(slope - car_angle, -PI, PI) * (8.0 + float(car["grip"]) * 3.0) * delta
-        angular_velocity *= pow(0.16, delta)
-    else:
-        grounded = false
-        velocity_y += GRAVITY * delta
-        body_y += velocity_y * delta
-        if accelerating:
-            angular_velocity -= 1.05 * delta
-        if reversing:
-            angular_velocity += 1.05 * delta
-        angular_velocity *= pow(0.992, delta)
-    car_angle += angular_velocity * delta
-    car_angle = wrapf(car_angle, -PI, PI)
-    for item in pickups:
-        if item["taken"]:
-            continue
-        if absf(float(item["x"]) - world_x) < 38.0 and absf(float(item["y"]) - body_y) < 82.0:
-            item["taken"] = true
-            if item["kind"] == "coin":
-                run_coins += 1
-            else:
-                fuel = minf(100.0, fuel + 30.0)
-                _show_toast("Fuel +30%")
-    if distance_m > best_distance:
-        best_distance = distance_m
-    if absf(car_angle) > 2.45 or body_y > 650.0:
-        _finish_run()
-    elif fuel <= 0.0 and velocity_x < 28.0:
-        _finish_run()
-    queue_redraw()
-
-func _finish_run() -> void:
-    if game_state != "playing":
-        return
-    bank_coins += run_coins
-    game_state = "crashed"
-    _save_progress()
-
-func _show_toast(message: String) -> void:
-    toast = message
-    toast_time = 1.5
-
-func _process(delta: float) -> void:
-    if toast_time > 0.0:
-        toast_time -= delta
-        if toast_time <= 0.0:
-            toast = ""
-    queue_redraw()
-
-func _input(event: InputEvent) -> void:
-    if event is InputEventKey and event.pressed and not event.echo:
-        if event.keycode == KEY_ESCAPE:
-            if game_state == "playing" or game_state == "garage" or game_state == "crashed":
-                game_state = "menu"
-            get_viewport().set_input_as_handled()
-    if event is InputEventScreenTouch:
-        if event.pressed:
-            _handle_press(event.position)
+    var data: Dictionary=CARS[selected]
+    if gas or Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_UP):
+        speed+=float(data["power"])*delta
+        fuel=maxf(0,fuel-2.1*delta)
+    if brake or Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_DOWN):
+        speed-=24*delta
+    speed=clampf(speed,0,float(data["top"]))
+    speed=move_toward(speed,0,0.8*delta)
+    distance+=speed*delta*1.7
+    wheel_spin+=speed*delta/0.66
+    var slope:=atan((_height(distance+0.8)-_height(distance-0.8))/1.6)
+    pitch=lerp_angle(pitch,-slope,minf(1,delta*(5+float(data["grip"])*2)))
+    var ground:=_height(distance)+0.15
+    bounce_speed+=(ground-car.position.y)*30*delta
+    bounce_speed*=pow(0.15,delta)
+    bounce+=bounce_speed*delta
+    car.position=Vector3(0,ground+bounce,distance)
+    car.rotation.x=pitch
+    for w in wheels:
+        w.rotation.x=wheel_spin
+    var size:=get_viewport().get_visible_rect().size
+    var portrait:=size.y>size.x
+    var cam_target:=car.position+Vector3(0,11 if portrait else 8,-23 if portrait else -15)
+    camera.position=camera.position.lerp(cam_target,minf(1,delta*3))
+    camera.look_at(car.position+Vector3(0,1.2,5),Vector3.UP)
+    # Pickups are placed at regular intervals along the road.
+    var checkpoint:=int(distance/32.0)
+    if checkpoint>0 and absf(distance-float(checkpoint)*32.0)<speed*delta*1.8+0.5:
+        if checkpoint%8==0:
+            fuel=minf(100,fuel+18)
         else:
-            touch_gas = false
-            touch_brake = false
-    elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
-        if event.pressed:
-            _handle_press(event.position)
-        else:
-            touch_gas = false
-            touch_brake = false
+            coins+=1
+    if distance>=WORLD_LENGTH-20 or fuel<=0:
+        _finish()
+    _update_hud()
 
-func _handle_press(pos: Vector2) -> void:
-    var scale := screen_size / VIEW
-    var p := pos / scale
-    if game_state == "playing":
-        if p.x > 690.0 and p.y > 410.0:
-            touch_gas = true
-        elif p.x < 270.0 and p.y > 410.0:
-            touch_brake = true
-        elif p.y < 58.0 and p.x < 130.0:
-            game_state = "menu"
-        return
-    if game_state == "menu":
-        if Rect2(330, 290, 300, 72).has_point(p):
-            _reset_run()
-            game_state = "playing"
-        elif Rect2(330, 380, 300, 65).has_point(p):
-            game_state = "garage"
-    elif game_state == "garage":
-        if Rect2(30, 25, 150, 55).has_point(p):
-            game_state = "menu"
-        elif Rect2(180, 345, 280, 70).has_point(p):
-            selected_car = (selected_car - 1 + CAR_DATA.size()) % CAR_DATA.size()
-        elif Rect2(500, 345, 280, 70).has_point(p):
-            selected_car = (selected_car + 1) % CAR_DATA.size()
-        elif Rect2(330, 435, 300, 65).has_point(p):
-            var price := int(CAR_DATA[selected_car]["price"])
-            if unlocked[selected_car]:
-                _save_progress()
-                game_state = "menu"
-                _show_toast("Vehicle selected")
-            elif bank_coins >= price:
-                bank_coins -= price
-                unlocked[selected_car] = true
-                _save_progress()
-                _show_toast("Vehicle unlocked!")
-            else:
-                _show_toast("Not enough coins")
-    elif game_state == "crashed":
-        if Rect2(330, 315, 300, 70).has_point(p):
-            _reset_run()
-            game_state = "playing"
-        elif Rect2(330, 400, 300, 60).has_point(p):
-            game_state = "menu"
+func _update_hud() -> void:
+    hud.text="COINS  %d     DISTANCE  %d m     SPEED  %d km/h" % [coins,int(distance),int(speed*3.6)]
+    fuel_bar.value=fuel
 
-func _draw() -> void:
-    var s := screen_size / VIEW
-    draw_set_transform(Vector2.ZERO, 0.0, s)
-    _draw_sky()
-    if game_state == "playing" or game_state == "crashed":
-        _draw_world()
-        _draw_hud()
-        if game_state == "crashed":
-            _draw_crash_overlay()
-    elif game_state == "garage":
-        _draw_garage()
-    else:
-        _draw_menu()
-    if toast_time > 0.0 and toast != "":
-        draw_rect(Rect2(365, 92, 230, 48), Color("#172b3ddd"), true)
-        _draw_text(toast, Vector2(480, 123), 21, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER)
+func _update_ui() -> void:
+    var active:=state=="playing" or state=="paused"
+    title.visible=state!="playing"
+    info.visible=state!="playing"
+    hud.visible=active
+    fuel_bar.visible=active
+    start_btn.visible=state=="menu"
+    garage_btn.visible=state=="menu"
+    retry_btn.visible=state=="crashed"
+    home_btn.visible=state=="crashed" or state=="paused"
+    prev_btn.visible=state=="garage"
+    next_btn.visible=state=="garage"
+    select_btn.visible=state=="garage"
+    gas_btn.visible=state=="playing"
+    brake_btn.visible=state=="playing"
+    pause_btn.visible=active
+    if state=="menu":
+        title.text="MOUNTAIN RIDER 3D"
+        info.text="Explore mountain roads  •  Offline driving"
+    elif state=="garage":
+        title.text=str(CARS[selected]["name"])
+        info.text="Wallet: %d coins   •   Vehicle %d of %d" % [wallet,selected+1,CARS.size()]
+        select_btn.text="SELECT VEHICLE" if unlocked[selected] else "UNLOCK  •  %d COINS" % int(CARS[selected]["price"])
+    elif state=="crashed":
+        title.text="RUN COMPLETE"
+        info.text="Distance: %d m   •   Coins: %d   •   Best: %d m" % [int(distance),coins,int(best)]
+    elif state=="paused":
+        title.text="PAUSED"
+        info.text="Tap pause to continue"
+    _update_hud()
 
-func _draw_sky() -> void:
-    draw_rect(Rect2(0, 0, 960, 540), Color("#83d1f4"), true)
-    draw_circle(Vector2(805, 92), 42, Color("#ffe98a"))
-    for i in range(4):
-        var x := fposmod(float(i) * 290.0 - world_x * 0.10, 1200.0) - 100.0
-        _draw_cloud(Vector2(x, 92.0 + float(i % 2) * 48.0))
-    for layer in range(2):
-        var col := Color("#a4c9b0") if layer == 0 else Color("#7eb19a")
-        var points := PackedVector2Array([Vector2(0, 390)])
-        for x in range(0, 981, 12):
-            var wx := float(x) + world_x * (0.18 if layer == 0 else 0.28)
-            points.append(Vector2(x, 275.0 + float(layer) * 43.0 + sin(wx * 0.004) * 48.0 + sin(wx * 0.012) * 19.0))
-        points.append(Vector2(960, 390))
-        draw_colored_polygon(points, col)
-
-func _draw_cloud(p: Vector2) -> void:
-    draw_circle(p, 19, Color("#ffffffd9"))
-    draw_circle(p + Vector2(22, -8), 25, Color("#ffffffd9"))
-    draw_circle(p + Vector2(49, 1), 18, Color("#ffffffd9"))
-
-func _draw_world() -> void:
-    var ground_points := PackedVector2Array([Vector2(0, 540)])
-    for x in range(0, 981, 5):
-        ground_points.append(Vector2(x, _ground_y(world_x + float(x) - 170.0)))
-    ground_points.append(Vector2(960, 540))
-    draw_colored_polygon(ground_points, Color("#78bd4c"))
-    var ridge := PackedVector2Array()
-    for x in range(0, 981, 5):
-        ridge.append(Vector2(x, _ground_y(world_x + float(x) - 170.0)))
-    draw_polyline(ridge, Color("#367c39"), 7.0, true)
-    for x in range(0, 981, 24):
-        var y := _ground_y(world_x + float(x) - 170.0)
-        draw_line(Vector2(x, y + 12), Vector2(x + 8, y + 17), Color("#d5a35e"), 2.0)
-    _draw_pickups()
-    _draw_car(Vector2(170, body_y), car_angle, CAR_DATA[selected_car]["color"])
-
-func _draw_pickups() -> void:
-    for item in pickups:
-        if item["taken"]:
-            continue
-        var x := float(item["x"]) - world_x + 170.0
-        if x < -30.0 or x > 990.0:
-            continue
-        var p := Vector2(x, float(item["y"]))
-        if item["kind"] == "coin":
-            draw_circle(p, 13, Color("#d88b13"))
-            draw_circle(p, 10, Color("#ffcf35"))
-            _draw_text("$", p + Vector2(0, 6), 16, Color("#9b6409"), HORIZONTAL_ALIGNMENT_CENTER)
-        else:
-            draw_rect(Rect2(p - Vector2(11, 13), Vector2(22, 27)), Color("#e54839"), true)
-            draw_rect(Rect2(p - Vector2(5, 8), Vector2(10, 13)), Color("#fff2c5"), true)
-            draw_rect(Rect2(p - Vector2(8, 17), Vector2(16, 5)), Color("#f8c83e"), true)
-
-func _draw_car(p: Vector2, rot: float, car_color: Color) -> void:
-    draw_set_transform(p, rot)
-    _draw_ellipse(Vector2(0, 9), Vector2(47, 8), Color("#31513c55"))
-    draw_colored_polygon(PackedVector2Array([Vector2(-43,-17),Vector2(-35,-31),Vector2(28,-31),Vector2(43,-17),Vector2(40,0),Vector2(-40,0)]), car_color)
-    draw_colored_polygon(PackedVector2Array([Vector2(-24,-29),Vector2(-12,-50),Vector2(18,-50),Vector2(34,-29)]), car_color.lightened(0.13))
-    draw_colored_polygon(PackedVector2Array([Vector2(-8,-45),Vector2(15,-45),Vector2(27,-31),Vector2(-17,-31)]), Color("#bdeaff"))
-    draw_line(Vector2(2,-46), Vector2(2,-31), Color("#547d91"), 2.0)
-    draw_rect(Rect2(31,-20,8,7), Color("#fff0a5"), true)
-    draw_rect(Rect2(-42,-18,7,7), Color("#ffb0a0"), true)
-    for wx in [-27.0, 27.0]:
-        draw_circle(Vector2(wx, 1), 14, Color("#202b32"))
-        draw_circle(Vector2(wx, 1), 7, Color("#aebbc0"))
-        draw_circle(Vector2(wx, 1), 3, Color("#59656c"))
-    draw_line(Vector2(-31,-5), Vector2(31,-5), Color("#652d28"), 2.0)
-    draw_set_transform(Vector2.ZERO)
-
-func _draw_hud() -> void:
-    _panel(Rect2(16, 14, 330, 58), Color("#18334acc"))
-    _draw_text("COINS  %d" % run_coins, Vector2(32, 50), 20, Color("#ffdc55"))
-    _draw_text("DIST  %d m" % int(distance_m), Vector2(175, 50), 20, Color.WHITE)
-    _panel(Rect2(690, 14, 250, 58), Color("#18334acc"))
-    _draw_text("FUEL", Vector2(706, 49), 17, Color.WHITE)
-    draw_rect(Rect2(765, 34, 155, 18), Color("#263e47"), true)
-    draw_rect(Rect2(767, 36, 151 * fuel / 100.0, 14), Color("#53d879") if fuel > 25 else Color("#ef5a48"), true)
-    _draw_button(Rect2(16, 88, 105, 45), "MENU", Color("#344c61"))
-    _draw_button(Rect2(24, 444, 190, 76), "BRAKE  ◀", Color("#344c61"))
-    _draw_button(Rect2(746, 444, 190, 76), "GAS  ▶", Color("#d94e37"))
-
-func _draw_menu() -> void:
-    _draw_text("MOUNTAIN RIDER", Vector2(480, 145), 48, Color("#18394a"), HORIZONTAL_ALIGNMENT_CENTER)
-    _draw_text("Climb higher. Collect coins. Keep your wheels down!", Vector2(480, 190), 19, Color("#284e5c"), HORIZONTAL_ALIGNMENT_CENTER)
-    _draw_car(Vector2(480, 260), -0.08, CAR_DATA[selected_car]["color"])
-    _panel(Rect2(350, 205, 260, 45), Color("#ffffff99"))
-    _draw_text("BEST  %d m     COINS  %d" % [int(best_distance), bank_coins], Vector2(480, 234), 18, Color("#18394a"), HORIZONTAL_ALIGNMENT_CENTER)
-    _draw_button(Rect2(330, 300, 300, 70), "START DRIVE", Color("#e65336"))
-    _draw_button(Rect2(330, 388, 300, 62), "GARAGE  🚙", Color("#2c7890"))
-    _draw_text("Offline game  •  Arrow keys / A-D or touch controls", Vector2(480, 500), 16, Color("#284e5c"), HORIZONTAL_ALIGNMENT_CENTER)
-
-func _draw_garage() -> void:
-    _draw_button(Rect2(30, 25, 150, 55), "← BACK", Color("#344c61"))
-    _draw_text("VEHICLE GARAGE", Vector2(480, 105), 39, Color("#18394a"), HORIZONTAL_ALIGNMENT_CENTER)
-    var car: Dictionary = CAR_DATA[selected_car]
-    _draw_car(Vector2(480, 245), -0.05, car["color"])
-    _panel(Rect2(275, 295, 410, 40), Color("#ffffffaa"))
-    _draw_text(str(car["name"]), Vector2(480, 323), 25, Color("#18394a"), HORIZONTAL_ALIGNMENT_CENTER)
-    _draw_text("Coins: %d    Power: %.2fx    Grip: %.2fx" % [bank_coins, car["power"], car["grip"]], Vector2(480, 365), 17, Color("#284e5c"), HORIZONTAL_ALIGNMENT_CENTER)
-    _draw_button(Rect2(180, 385, 280, 65), "◀ PREVIOUS", Color("#2c7890"))
-    _draw_button(Rect2(500, 385, 280, 65), "NEXT ▶", Color("#2c7890"))
-    var price := int(car["price"])
-    var action := "SELECTED — PLAY" if unlocked[selected_car] else "UNLOCK  •  %d COINS" % price
-    _draw_button(Rect2(330, 465, 300, 60), action, Color("#e65336") if unlocked[selected_car] or bank_coins >= price else Color("#667781"))
-    _draw_text("Vehicle %d / %d" % [selected_car + 1, CAR_DATA.size()], Vector2(480, 460), 15, Color("#284e5c"), HORIZONTAL_ALIGNMENT_CENTER)
-
-func _draw_crash_overlay() -> void:
-    draw_rect(Rect2(0, 0, 960, 540), Color("#071923bb"), true)
-    _draw_text("RUN OVER!", Vector2(480, 180), 48, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER)
-    _draw_text("Distance: %d m     Coins collected: %d" % [int(distance_m), run_coins], Vector2(480, 230), 22, Color("#ffdf75"), HORIZONTAL_ALIGNMENT_CENTER)
-    _draw_text("Best: %d m     Wallet: %d" % [int(best_distance), bank_coins], Vector2(480, 265), 18, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER)
-    _draw_button(Rect2(330, 315, 300, 65), "TRY AGAIN", Color("#e65336"))
-    _draw_button(Rect2(330, 400, 300, 58), "MAIN MENU", Color("#2c7890"))
-
-func _panel(rect: Rect2, color: Color) -> void:
-    draw_rect(rect, color, true)
-    draw_rect(rect, Color("#ffffff44"), false, 2.0)
-
-func _draw_button(rect: Rect2, label: String, color: Color) -> void:
-    draw_rect(rect, color, true)
-    draw_rect(rect, Color("#ffffff66"), false, 2.0)
-    _draw_text(label, rect.position + Vector2(rect.size.x / 2.0, rect.size.y / 2.0 + 7.0), 21, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER)
-
-func _draw_text(value: String, pos: Vector2, size: int, color: Color, align: int = HORIZONTAL_ALIGNMENT_LEFT) -> void:
-    var font := ThemeDB.fallback_font
-    draw_string(font, pos, value, align, -1, size, color)
-
-func _draw_ellipse(center: Vector2, radii: Vector2, color: Color) -> void:
-    var pts := PackedVector2Array()
-    for i in range(25):
-        var a := TAU * float(i) / 24.0
-        pts.append(center + Vector2(cos(a) * radii.x, sin(a) * radii.y))
-    draw_colored_polygon(pts, color)
+func _process(_delta: float) -> void:
+    if car_body!=null:
+        car_body.material_override=_mat(CARS[selected]["color"])
+    if state!="playing":
+        var portrait:=get_viewport().get_visible_rect().size.y>get_viewport().get_visible_rect().size.x
+        var target:=Vector3(0,12,-25) if portrait else Vector3(0,8,-17)
+        camera.position=camera.position.lerp(target,0.025)
+        camera.look_at(Vector3(0,1.5,3),Vector3.UP)
