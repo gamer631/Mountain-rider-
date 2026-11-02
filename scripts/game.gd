@@ -131,6 +131,10 @@ func _make_environment() -> void:
     sun.shadow_enabled = true
     sun.directional_shadow_max_distance = 150.0
     sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
+    sun.shadow_enabled = graphics_high
+    sun.directional_shadow_max_distance = 150.0 if graphics_high else 65.0
+    env.fog_enabled = graphics_high
+    env.glow_enabled = graphics_high
     add_child(sun)
     camera = Camera3D.new()
     camera.current = true
