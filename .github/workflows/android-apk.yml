@@ -32,7 +32,7 @@ jobs:
           fi
           echo "Found sdkmanager at: $SDKMANAGER"
           yes | "$SDKMANAGER" --licenses >/dev/null || true
-          "$SDKMANAGER" "platform-tools" "platforms;android-35" "build-tools;35.0.0" "ndk;28.1.13356709" "cmake;3.10.2.4988404"
+          "$SDKMANAGER" "platform-tools" "platforms;android-34" "build-tools;34.0.0" "cmdline-tools;latest" "ndk;23.2.8568313" "cmake;3.10.2.4988404"
           echo "/usr/local/lib/android/sdk/platform-tools" >> "$GITHUB_PATH"
 
       - name: Install Godot and export templates
@@ -68,6 +68,13 @@ jobs:
       - name: Export APK
         run: |
           mkdir -p build
+          export GODOT_ANDROID_KEYSTORE_DEBUG_PATH="$HOME/.android/debug.keystore"
+          export GODOT_ANDROID_KEYSTORE_DEBUG_USER="androiddebugkey"
+          export GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD="android"
+          test -x "$ANDROID_HOME/platform-tools/adb"
+          test -d "$ANDROID_HOME/platforms/android-34"
+          test -d "$ANDROID_HOME/build-tools/34.0.0"
+          test -d "$ANDROID_HOME/ndk/23.2.8568313"
           godot --headless --verbose --path . --export-debug "Android" build/MountainRider.apk
 
       - name: Upload APK artifact
