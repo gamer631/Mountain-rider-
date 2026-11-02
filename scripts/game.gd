@@ -77,7 +77,8 @@ func _height(z: float) -> float:
 func _mat(c: Color) -> StandardMaterial3D:
     var m := StandardMaterial3D.new()
     m.albedo_color = c
-    m.roughness = 0.95
+    m.roughness = 0.78
+    m.metallic = 0.02
     return m
 
 func _make_environment() -> void:
@@ -219,7 +220,7 @@ func _make_nepal_landmarks() -> void:
         sign.position = pos + Vector3(0, 4.0, 0)
         sign.modulate = Color("#fff0c9")
         add_child(sign)
-        var places := str(REGIONS[i]["places"]).split(" · ")
+        var places := str(REGIONS[i]["places"]).split(" - ")
         for place_index in range(places.size()):
             var destination := Label3D.new()
             destination.text = places[place_index]
