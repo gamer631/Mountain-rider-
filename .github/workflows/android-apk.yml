@@ -5,6 +5,9 @@ on:
   push:
     branches: [ main ]
 
+permissions:
+  contents: write
+
 jobs:
   android:
     runs-on: ubuntu-latest
@@ -72,3 +75,11 @@ jobs:
           name: Mountain-Rider-Android-APK
           path: build/MountainRider.apk
           if-no-files-found: error
+
+      - name: Publish APK release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: android-v1.0.${{ github.run_number }}
+          name: Mountain Rider Android v1.0.${{ github.run_number }}
+          files: build/MountainRider.apk
+          make_latest: true
